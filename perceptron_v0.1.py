@@ -2,8 +2,7 @@ import copy
 import math
 import numpy as np
 
-#Global variables
-
+# Peceptron Tester Function
 def perceptron_test (X, Y, W, bias):
   total_error = 0
   rows = X.shape[0]
@@ -12,9 +11,11 @@ def perceptron_test (X, Y, W, bias):
       total_error += 1
   return total_error
 
+
+
+# Perceptron Learner Function
 def perceptron(X, Y, W, rate, bias, epochs):
     cols = X.shape[1]
-    best_w = np.zeros(cols)
     rows = X.shape[0]
 
     total_error = 0
@@ -27,21 +28,19 @@ def perceptron(X, Y, W, rate, bias, epochs):
                 W = W + rate*X[i]*Y[i,0]
                 bias = bias + (Y[i,0]*rate)
                 total_error += 1
+    return W, bias
 
-        #print ("Epoch ", t, "Total Error", total_error)
-        if (total_error < lowest_error):
-          lowest_error = total_error
-          lowest_error_epoch = t
-          best_w = copy.deepcopy(W)
-    #print ("Lowest error : ",lowest_error, "on epoch", lowest_error_epoch)
-    return best_w
 
+
+# Utility Function
 def file_len(fname):
   with open(fname) as f:
     for i, l in enumerate(f):
       pass
   return i + 1
 
+
+# Utility Function
 def data_in_x_y_format (filename, no_of_columns):
   no_of_rows = file_len (filename)
   data = np.zeros ((no_of_rows, no_of_columns))
@@ -67,9 +66,9 @@ def data_in_x_y_format (filename, no_of_columns):
   X = np.delete (data, 0, axis=1)
   return X, Y
 
-# Simple perceptron cross validation
-# For each hyperparameter combination, run the cross validation
 
+
+# Cross validation function
 def cross_validation (kfold, eta, bias, epochs, no_of_columns, W):
   accuracy = 0
   for i in range (0, kfold):
@@ -86,11 +85,11 @@ def cross_validation (kfold, eta, bias, epochs, no_of_columns, W):
 
     #Cross Validation Training 
     X, Y = data_in_x_y_format ('temporary.data', no_of_columns)
-    new_W = perceptron(X,Y,W,eta,bias,epochs)
+    new_W, new_bias = perceptron(X,Y,W,eta,bias,epochs)
 
     #Cross Validation Testing
     X, Y = data_in_x_y_format ('training0'+str(i)+'.data', no_of_columns)
-    errors = perceptron_test (X, Y, new_W, bias)
+    errors = perceptron_test (X, Y, new_W, new_bias)
 
     accuracy += (1-(errors/(X.shape[0])))*100
   return (accuracy/kfold)
@@ -118,25 +117,28 @@ for current_eta in eta:
 best_accuracy = 0
 best_epoch = 0
 best_w = np.zeros(no_of_columns - 1)
+best_bias = 0
 #Train the perceptron now
 for i in range (1, 21):
   X, Y = data_in_x_y_format ('diabetes.train', no_of_columns)
-  new_W = perceptron(X, Y, W, best_eta, bias, i)
+  new_W, new_bias = perceptron(X, Y, W, best_eta, bias, i)
 
   X, Y = data_in_x_y_format ('diabetes.dev', no_of_columns)
-  errors = perceptron_test (X, Y, new_W, bias)
+  errors = perceptron_test (X, Y, new_W, new_bias)
   accuracy = (1-(errors/(X.shape[0])))*100
   if (accuracy > best_accuracy):
     best_accuracy = accuracy
     best_epoch = i
+    best_w = copy.deepcopy (new_W)
+    best_bias = new_bias
 
 print ("")
-print ("Best epoch and eta")
+print ("Best epoch and eta on development set")
 print ("===================================================================")
 print ("Best epoch : ", best_epoch, "best eta", best_eta, "accuracy is ", best_accuracy, "%")
 
 X, Y = data_in_x_y_format ('diabetes.test', no_of_columns)
-errors = perceptron_test (X, Y, new_W, bias)
+errors = perceptron_test (X, Y, best_w, best_bias)
 accuracy = (1-(errors/(X.shape[0])))*100
 print ("")
 print ("Results on the test file as follows")
