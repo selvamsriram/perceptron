@@ -13,7 +13,7 @@ def perceptron_test (X, Y, W, bias, mu):
       if ((np.dot(X[i], W) + bias)*Y[i,0]) < mu:
         total_error += 1
     else:
-      if ((np.dot(X[i], W) + bias)*Y[i,0]) <= 0:
+      if ((np.dot(X[i], W) + bias)*Y[i,0]) < 0:
         total_error += 1
   return total_error
 
@@ -36,7 +36,7 @@ def perceptron(X, Y, W, rate, mu, bias, epochs, declining_eta):
                     W = W + rate*X[i]*Y[i,0]
                     bias = bias + (Y[i,0]*rate)
             else:
-              if ((np.dot(X[i], W) + bias)*Y[i,0]) <= 0:
+              if ((np.dot(X[i], W) + bias)*Y[i,0]) < 0:
                   if (declining_eta == 0):
                     W = W + rate*X[i]*Y[i,0]
                     bias = bias + (Y[i,0]*rate)
