@@ -2,35 +2,63 @@ import copy
 import math
 import numpy as np
 
+#--------------------------------------------------------------------------------------------------
+
 # Peceptron Tester Function
-def perceptron_test (X, Y, W, bias):
+def perceptron_test (X, Y, W, bias, mu):
   total_error = 0
   rows = X.shape[0]
   for i in range (0, rows):
-    if ((np.dot(X[i], W) + bias)*Y[i,0]) <= 0:
-      total_error += 1
+    if (mu > 0):
+      if ((np.dot(X[i], W) + bias)*Y[i,0]) < mu:
+        total_error += 1
+    else:
+      if ((np.dot(X[i], W) + bias)*Y[i,0]) <= 0:
+        total_error += 1
   return total_error
 
-
+#--------------------------------------------------------------------------------------------------
 
 # Perceptron Learner Function
-def perceptron(X, Y, W, rate, bias, epochs, declining_eta):
+def perceptron(X, Y, W, rate, mu, bias, epochs, declining_eta):
     cols = X.shape[1]
     rows = X.shape[0]
 
     for t in range(0, epochs):
         for i in range (0, rows):
-            if ((np.dot(X[i], W) + bias)*Y[i,0]) <= 0:
-                if (declining_eta == 0):
-                  W = W + rate*X[i]*Y[i,0]
-                  bias = bias + (Y[i,0]*rate)
-                else:
-                  rate = (rate/(1+t))
-                  W = W + rate*X[i]*Y[i,0]
-                  bias = bias + (Y[i,0]*rate)
+            if (mu > 0):
+              if ((np.dot(X[i], W) + bias)*Y[i,0]) < mu:
+                  if (declining_eta == 0):
+                    W = W + rate*X[i]*Y[i,0]
+                    bias = bias + (Y[i,0]*rate)
+                  else:
+                    rate = (rate/(1+t))
+                    W = W + rate*X[i]*Y[i,0]
+                    bias = bias + (Y[i,0]*rate)
+            else:
+              if ((np.dot(X[i], W) + bias)*Y[i,0]) <= 0:
+                  if (declining_eta == 0):
+                    W = W + rate*X[i]*Y[i,0]
+                    bias = bias + (Y[i,0]*rate)
+                  else:
+                    rate = (rate/(1+t))
+                    W = W + rate*X[i]*Y[i,0]
+                    bias = bias + (Y[i,0]*rate)
     return W, bias
 
+#--------------------------------------------------------------------------------------------------
 
+def train_and_test_perceptron (train_filename, test_filename, no_of_columns, W, eta, mu, bias, epochs, declining_eta):
+  X, Y = data_in_x_y_format (train_filename, no_of_columns)
+  new_W, new_bias = perceptron(X, Y, W, eta, mu, bias, epochs, declining_eta)
+
+  X, Y = data_in_x_y_format (test_filename, no_of_columns)
+  errors = perceptron_test (X, Y, new_W, new_bias, mu)
+
+  accuracy = (1-(errors/(X.shape[0])))*100
+  return accuracy, new_W, new_bias
+
+#--------------------------------------------------------------------------------------------------
 
 # Utility Function
 def file_len(fname):
@@ -39,6 +67,7 @@ def file_len(fname):
       pass
   return i + 1
 
+#--------------------------------------------------------------------------------------------------
 
 # Utility Function
 def data_in_x_y_format (filename, no_of_columns):
@@ -66,11 +95,12 @@ def data_in_x_y_format (filename, no_of_columns):
   X = np.delete (data, 0, axis=1)
   return X, Y
 
-
+#--------------------------------------------------------------------------------------------------
 
 # Cross validation function
-def cross_validation (kfold, eta, bias, epochs, no_of_columns, W, declining_eta):
+def cross_validation (kfold, eta, mu, bias, epochs, no_of_columns, W, declining_eta):
   accuracy = 0
+  consolidated_accuracy = 0
   for i in range (0, kfold):
     training_filenames = []
     for j in range (0, kfold):
@@ -83,119 +113,79 @@ def cross_validation (kfold, eta, bias, epochs, no_of_columns, W, declining_eta)
           for line in iterfile:
             temp_file.write (line)
 
-    #Cross Validation Training 
-    X, Y = data_in_x_y_format ('temporary.data', no_of_columns)
-    new_W, new_bias = perceptron(X,Y,W,eta,bias,epochs, declining_eta)
+    #Cross Validation Training
+    accuracy, new_W, new_bias = train_and_test_perceptron ('temporary.data', 'training0'+str(i)+'.data',
+                                                  no_of_columns, W, eta, mu, bias, epochs, declining_eta)
+    consolidated_accuracy += accuracy 
+  return (consolidated_accuracy/kfold)
 
-    #Cross Validation Testing
-    X, Y = data_in_x_y_format ('training0'+str(i)+'.data', no_of_columns)
-    errors = perceptron_test (X, Y, new_W, new_bias)
+#--------------------------------------------------------------------------------------------------
 
-    accuracy += (1-(errors/(X.shape[0])))*100
-  return (accuracy/kfold)
+def train_test_request_processor (kfold, eta, mu, bias, epochs, no_of_columns, W, declining_rate):
+  best_accuracy = 0
+  #Basic cross validation (Only ETA)
+  for current_mu in mu:
+    for current_eta in eta:
+      W_copy = copy.deepcopy (W)
+      accuracy =  cross_validation (kfold, current_eta, current_mu, bias, epochs, no_of_columns, W_copy, declining_rate)
+      if (accuracy > best_accuracy):
+        best_accuracy = accuracy
+        best_eta = current_eta
+        best_mu = current_mu
 
-# Input parameters
-eta             = [1, 0.1, 0.01]
+  print ("Cross Validation Selected - ETA : ", best_eta)
+  print ("Cross Validation Selected - MU  : ", best_mu)
+  # Re-init for future use
+  best_accuracy = 0
+  best_epoch = 0
+  best_w = np.zeros(no_of_columns - 1)
+  best_bias = 0
+
+  #Train for each epoch and test in development data for each of them and measure accuracy
+  for i in range (1, 21):
+    accuracy, new_W, new_bias = train_and_test_perceptron ('diabetes.train', 'diabetes.dev', no_of_columns,
+                                                           W, best_eta, best_mu, bias, i, declining_rate)
+    if (accuracy > best_accuracy):
+      best_accuracy = accuracy
+      best_epoch = i
+      best_w = copy.deepcopy (new_W)
+      best_bias = new_bias
+
+  print ("Best epoch                      : ", best_epoch)
+  print ("Dev Accuracy                    : ", best_accuracy, "%")
+
+  X, Y = data_in_x_y_format ('diabetes.test', no_of_columns)
+  errors = perceptron_test (X, Y, best_w, best_bias, best_mu)
+  accuracy = (1-(errors/(X.shape[0])))*100
+  print ("Test File Accuracy              : ", accuracy, "%")
+
+
+#--------------------------------------------------------------------------------------------------
+
+# Main Function Starts here 
 kfold           = 5
 no_of_columns   = 20
+eta_list        = [1, 0.1, 0.01]
+mu_list         = [0]
+W               = np.random.uniform(-0.01, 0.01, no_of_columns-1)
 bias            = np.random.uniform(-0.01,0.01)
 epochs          = 10 
-W               = np.random.uniform(-0.01, 0.01, no_of_columns-1)
-best_eta        = 0
-best_accuracy   = 0 
+declining_rate  = 0
 
-print ("Cross validation results for only ETA")
-print ("===================================================================")
-#Basic cross validation (Only ETA)
-for current_eta in eta:
-  W_copy = copy.deepcopy (W)
-  accuracy =  cross_validation (kfold, current_eta, bias, epochs, no_of_columns, W_copy, 0)
-  print ("ETA : ", current_eta, "Average Cross Validation Accuracy : ", accuracy, "%")
-  if (accuracy > best_accuracy):
-    best_accuracy = accuracy
-    best_eta = current_eta
-
-best_accuracy = 0
-best_epoch = 0
-best_w = np.zeros(no_of_columns - 1)
-best_bias = 0
-#Train the perceptron now
-for i in range (1, 21):
-  X, Y = data_in_x_y_format ('diabetes.train', no_of_columns)
-  new_W, new_bias = perceptron(X, Y, W, best_eta, bias, i, 0)
-
-  X, Y = data_in_x_y_format ('diabetes.dev', no_of_columns)
-  errors = perceptron_test (X, Y, new_W, new_bias)
-  accuracy = (1-(errors/(X.shape[0])))*100
-  if (accuracy > best_accuracy):
-    best_accuracy = accuracy
-    best_epoch = i
-    best_w = copy.deepcopy (new_W)
-    best_bias = new_bias
-
+print ("******************Basic Perceptron Start *******************")
+train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate)
+print ("******************Basic Perceptron End *********************")
 print ("")
-print ("Best epoch and eta on development set consideing") 
-print ("===================================================================")
-print ("Best epoch : ", best_epoch, "best eta", best_eta, "accuracy is ", best_accuracy, "%")
 
-X, Y = data_in_x_y_format ('diabetes.test', no_of_columns)
-errors = perceptron_test (X, Y, best_w, best_bias)
-accuracy = (1-(errors/(X.shape[0])))*100
+# Enable Decaying rate
+print ("*****************Decaying learning rate Start***************")
+declining_rate = 1
+train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate)
+print ("*****************Decaying learning rate End End ************")
 print ("")
-print ("Results on the test file as follows")
-print ("===================================================================")
-print ("Accuracy : ", accuracy, "%")
 
-
-
-
-# Decaying learning rate
-print ("")
-print ("Decaying learning rate")
-print ("===================================================================")
-best_eta        = 0
-best_accuracy   = 0 
-
-print ("Cross validation results")
-print ("===================================================================")
-#Basic cross validation (Only ETA)
-for current_eta in eta:
-  W_copy = copy.deepcopy (W)
-  accuracy =  cross_validation (kfold, current_eta, bias, epochs, no_of_columns, W_copy, 1)
-  print ("ETA : ", current_eta, "Average Cross Validation Accuracy : ", accuracy, "%")
-  if (accuracy > best_accuracy):
-    best_accuracy = accuracy
-    best_eta = current_eta
-
-best_accuracy = 0
-best_epoch = 0
-best_w = np.zeros(no_of_columns - 1)
-best_bias = 0
-#Train the perceptron now
-for i in range (1, 21):
-  X, Y = data_in_x_y_format ('diabetes.train', no_of_columns)
-  new_W, new_bias = perceptron(X, Y, W, best_eta, bias, i, 1)
-
-  X, Y = data_in_x_y_format ('diabetes.dev', no_of_columns)
-  errors = perceptron_test (X, Y, new_W, new_bias)
-  accuracy = (1-(errors/(X.shape[0])))*100
-  if (accuracy > best_accuracy):
-    best_accuracy = accuracy
-    best_epoch = i
-    best_w = copy.deepcopy (new_W)
-    best_bias = new_bias
-
-print ("")
-print ("Best epoch and eta on development set consideing") 
-print ("===================================================================")
-print ("Best epoch : ", best_epoch, "best eta", best_eta, "accuracy is ", best_accuracy, "%")
-
-X, Y = data_in_x_y_format ('diabetes.test', no_of_columns)
-errors = perceptron_test (X, Y, best_w, best_bias)
-accuracy = (1-(errors/(X.shape[0])))*100
-print ("")
-print ("Results on the test file as follows")
-print ("===================================================================")
-print ("Accuracy : ", accuracy, "%")
-
-
+# Update values for mu
+print ("*****************Margin Perceptron Start********************")
+mu_list         = [1, 0.1, 0.01]
+train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate)
+print ("*****************Margin Perceptron End *********************")
