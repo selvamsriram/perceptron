@@ -4,21 +4,17 @@ import numpy as np
 
 # Peceptron Tester Function
 #--------------------------------------------------------------------------------------------------
-def perceptron_test (X, Y, W, bias, mu):
+def perceptron_test (X, Y, W, bias):
   total_error = 0
   rows = X.shape[0]
   for i in range (0, rows):
-    if (mu > 0):
-      if ((np.dot(X[i], W) + bias)*Y[i,0]) < mu:
-        total_error += 1
-    else:
-      if ((np.dot(X[i], W) + bias)*Y[i,0]) <= 0:
-        total_error += 1
+    if ((np.dot(X[i], W) + bias)*Y[i,0]) <= 0:
+      total_error += 1
   return total_error
 
 # Perceptron Learner Function
 #--------------------------------------------------------------------------------------------------
-def perceptron(X, Y, W, rate, mu, bias, epochs, declining_eta, average_mode):
+def perceptron(X, Y, W, rate, mu, bias, epochs, declining_eta, average_mode, aggressive_mode):
     cols = X.shape[1]
     rows = X.shape[0]
     if average_mode > 0:
@@ -32,14 +28,16 @@ def perceptron(X, Y, W, rate, mu, bias, epochs, declining_eta, average_mode):
         Y = Y[randomize]
         for i in range (0, rows):
             if (mu > 0):
+              # Margin perceptron and Aggressive Perceptron
               if ((np.dot(X[i], W) + bias)*Y[i,0]) < mu:
-                  if (declining_eta == 0):
-                    W = W + rate*X[i]*Y[i,0]
-                    bias = bias + (Y[i,0]*rate)
-                  else:
-                    rate = (rate/(1+t))
-                    W = W + rate*X[i]*Y[i,0]
-                    bias = bias + (Y[i,0]*rate)
+                if (aggressive_mode == 0):
+                  #Margin perceptron
+                  W = W + rate*X[i]*Y[i,0]
+                  bias = bias + (Y[i,0]*rate)
+                elif (aggressive_mode == 1):
+                  #Aggressive perceptron
+                  rate = (mu - ((np.dot(X[i], W) + bias)*Y[i,0]))/(np.dot (X[i], X[i]) + 1)
+                  W = W + rate*X[i]*Y[i,0]
             else:
               if ((np.dot(X[i], W) + bias)*Y[i,0]) <= 0:
                   if (declining_eta == 0):
@@ -63,12 +61,12 @@ def perceptron(X, Y, W, rate, mu, bias, epochs, declining_eta, average_mode):
 
 # Train and test function
 #--------------------------------------------------------------------------------------------------
-def train_and_test_perceptron (train_filename, test_filename, no_of_columns, W, eta, mu, bias, epochs, declining_eta, average_mode):
+def train_and_test_perceptron (train_filename, test_filename, no_of_columns, W, eta, mu, bias, epochs, declining_eta, average_mode, aggressive_mode):
   X, Y = data_in_x_y_format (train_filename, no_of_columns)
-  new_W, new_bias = perceptron(X, Y, W, eta, mu, bias, epochs, declining_eta, average_mode)
+  new_W, new_bias = perceptron(X, Y, W, eta, mu, bias, epochs, declining_eta, average_mode, aggressive_mode)
 
   X, Y = data_in_x_y_format (test_filename, no_of_columns)
-  errors = perceptron_test (X, Y, new_W, new_bias, mu)
+  errors = perceptron_test (X, Y, new_W, new_bias)
 
   accuracy = (1-(errors/(X.shape[0])))*100
   return accuracy, new_W, new_bias
@@ -110,7 +108,7 @@ def data_in_x_y_format (filename, no_of_columns):
 
 # Cross validation function
 #--------------------------------------------------------------------------------------------------
-def cross_validation (kfold, eta, mu, bias, epochs, no_of_columns, W, declining_eta, average_mode):
+def cross_validation (kfold, eta, mu, bias, epochs, no_of_columns, W, declining_eta, average_mode, aggressive_mode):
   accuracy = 0
   consolidated_accuracy = 0
   for i in range (0, kfold):
@@ -127,19 +125,19 @@ def cross_validation (kfold, eta, mu, bias, epochs, no_of_columns, W, declining_
 
     #Cross Validation Training
     accuracy, new_W, new_bias = train_and_test_perceptron ('temporary.data', 'training0'+str(i)+'.data',
-                                                  no_of_columns, W, eta, mu, bias, epochs, declining_eta, average_mode)
+                                                  no_of_columns, W, eta, mu, bias, epochs, declining_eta, average_mode, aggressive_mode)
     consolidated_accuracy += accuracy 
   return (consolidated_accuracy/kfold)
 
 # Mother ship
 #--------------------------------------------------------------------------------------------------
-def train_test_request_processor (kfold, eta, mu, bias, epochs, no_of_columns, W, declining_rate, average_mode):
+def train_test_request_processor (kfold, eta, mu, bias, epochs, no_of_columns, W, declining_rate, average_mode, aggressive_mode):
   best_accuracy = 0
   #Basic cross validation (Only ETA)
   for current_mu in mu:
     for current_eta in eta:
       W_copy = copy.deepcopy (W)
-      accuracy =  cross_validation (kfold, current_eta, current_mu, bias, epochs, no_of_columns, W_copy, declining_rate, average_mode)
+      accuracy =  cross_validation (kfold, current_eta, current_mu, bias, epochs, no_of_columns, W_copy, declining_rate, average_mode, aggressive_mode)
       if (accuracy > best_accuracy):
         best_accuracy = accuracy
         best_eta = current_eta
@@ -156,7 +154,7 @@ def train_test_request_processor (kfold, eta, mu, bias, epochs, no_of_columns, W
   #Train for each epoch and test in development data for each of them and measure accuracy
   for i in range (1, 21):
     accuracy, new_W, new_bias = train_and_test_perceptron ('diabetes.train', 'diabetes.dev', no_of_columns,
-                                                           W, best_eta, best_mu, bias, i, declining_rate, average_mode)
+                                                           W, best_eta, best_mu, bias, i, declining_rate, average_mode, aggressive_mode)
     if (accuracy > best_accuracy):
       best_accuracy = accuracy
       best_epoch = i
@@ -167,7 +165,7 @@ def train_test_request_processor (kfold, eta, mu, bias, epochs, no_of_columns, W
   print ("Dev Accuracy                    : ", best_accuracy, "%")
 
   X, Y = data_in_x_y_format ('diabetes.test', no_of_columns)
-  errors = perceptron_test (X, Y, best_w, best_bias, best_mu)
+  errors = perceptron_test (X, Y, best_w, best_bias)
   accuracy = (1-(errors/(X.shape[0])))*100
   print ("Test File Accuracy              : ", accuracy, "%")
   return accuracy
@@ -186,32 +184,40 @@ def main_function (seed_value):
   epochs          = 10 
   declining_rate  = 0
   average_mode    = 0
-
+  aggressive_mode = 0
+  print ("")
   print ("******************Basic Perceptron Start *******************")
   print ("******************Seed Value", seed_value, "*******************")
-  accuracy = train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode)
+  accuracy = train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode, aggressive_mode)
   print ("******************Basic Perceptron End *********************")
-  print ("")
 
   # Enable Decaying rate
   print ("*****************Decaying learning rate Start***************")
   declining_rate = 1
-  train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode)
+  train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode, aggressive_mode)
   print ("*****************Decaying learning rate End End ************")
-  print ("")
 
   # Update values for mu
   print ("*****************Margin Perceptron Start********************")
   mu_list         = [1, 0.1, 0.01]
-  train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode)
+  train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode, aggressive_mode)
   print ("*****************Margin Perceptron End *********************")
 
   # Enable average mode
   print ("*****************Average Perceptron Start********************")
   average_mode = 1
   mu_list = [0]
-  train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode)
+  train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode, aggressive_mode)
   print ("*****************Average Perceptron End *********************")
+
+  # Enable Aggressive mode
+  print ("*****************Aggressive Perceptron Start********************")
+  aggressive_mode = 1
+  average_mode = 0
+  eta_list        = [1]
+  mu_list         = [1, 0.1, 0.01]
+  train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode, aggressive_mode)
+  print ("*****************Aggressive Perceptron End *********************")
 
   return accuracy
 
