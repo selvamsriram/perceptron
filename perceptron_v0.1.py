@@ -8,7 +8,7 @@ def perceptron_test (X, Y, W, bias):
   total_error = 0
   rows = X.shape[0]
   for i in range (0, rows):
-    if ((np.dot(X[i], W) + bias)*Y[i,0]) <= 0:
+    if ((np.dot(X[i], W) + bias)*Y[i,0]) < 0:
       total_error += 1
   return total_error
 
@@ -29,12 +29,13 @@ def perceptron(X, Y, W, rate, mu, bias, epochs, declining_eta, average_mode, agg
         for i in range (0, rows):
             if (mu > 0):
               # Margin perceptron and Aggressive Perceptron
-              if ((np.dot(X[i], W) + bias)*Y[i,0]) < mu:
-                if (aggressive_mode == 0):
+              if (aggressive_mode == 0):
+                if ((np.dot(X[i], W) + bias)*Y[i,0]) < mu:
                   #Margin perceptron
                   W = W + rate*X[i]*Y[i,0]
                   bias = bias + (Y[i,0]*rate)
-                elif (aggressive_mode == 1):
+              elif (aggressive_mode == 1):
+                if ((np.dot(X[i], W) + bias)*Y[i,0]) <= mu:
                   #Aggressive perceptron
                   rate = (mu - ((np.dot(X[i], W) + bias)*Y[i,0]))/(np.dot (X[i], X[i]) + 1)
                   W = W + rate*X[i]*Y[i,0]
@@ -155,6 +156,7 @@ def train_test_request_processor (kfold, eta, mu, bias, epochs, no_of_columns, W
   for i in range (1, 21):
     accuracy, new_W, new_bias = train_and_test_perceptron ('diabetes.train', 'diabetes.dev', no_of_columns,
                                                            W, best_eta, best_mu, bias, i, declining_rate, average_mode, aggressive_mode)
+    print ("  Dev - Epoch  : ", i, "Accuracy  : ", accuracy)
     if (accuracy > best_accuracy):
       best_accuracy = accuracy
       best_epoch = i
@@ -162,7 +164,7 @@ def train_test_request_processor (kfold, eta, mu, bias, epochs, no_of_columns, W
       best_bias = new_bias
 
   print ("Best epoch                      : ", best_epoch)
-  print ("Dev Accuracy                    : ", best_accuracy, "%")
+  print ("Best Dev Accuracy               : ", best_accuracy, "%")
 
   X, Y = data_in_x_y_format ('diabetes.test', no_of_columns)
   errors = perceptron_test (X, Y, best_w, best_bias)
@@ -190,45 +192,46 @@ def main_function (seed_value):
   print ("******************Seed Value", seed_value, "*******************")
   accuracy = train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode, aggressive_mode)
   print ("******************Basic Perceptron End *********************")
-
   # Enable Decaying rate
   print ("*****************Decaying learning rate Start***************")
   declining_rate = 1
   train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode, aggressive_mode)
+  declining_rate = 0
   print ("*****************Decaying learning rate End End ************")
 
   # Update values for mu
   print ("*****************Margin Perceptron Start********************")
   mu_list         = [1, 0.1, 0.01]
   train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode, aggressive_mode)
+  mu_list = [0]
   print ("*****************Margin Perceptron End *********************")
 
   # Enable average mode
   print ("*****************Average Perceptron Start********************")
   average_mode = 1
-  mu_list = [0]
   train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode, aggressive_mode)
+  average_mode = 0
   print ("*****************Average Perceptron End *********************")
 
   # Enable Aggressive mode
   print ("*****************Aggressive Perceptron Start********************")
   aggressive_mode = 1
-  average_mode = 0
   eta_list        = [1]
   mu_list         = [1, 0.1, 0.01]
   train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode, aggressive_mode)
   print ("*****************Aggressive Perceptron End *********************")
-
   return accuracy
 
 
 main_function (11)
-#best_accuracy = 0;
-#cur_accuracy = 0;
-#for i in range (0, 50):
-#  cur_accuracy = main_function (i)
-#  if (cur_accuracy > best_accuracy):
-#    best_accuracy = cur_accuracy
-#    best_seed = i
+'''
+best_accuracy = 0;
+cur_accuracy = 0;
+for i in range (0, 200):
+  cur_accuracy = main_function (i)
+  if (cur_accuracy > best_accuracy):
+    best_accuracy = cur_accuracy
+    best_seed = i
 
-#print ("Best seed is ", best_seed)
+print ("Best seed is ", best_seed)
+'''
