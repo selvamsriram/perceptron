@@ -27,6 +27,10 @@ def perceptron(X, Y, W, rate, mu, bias, epochs, declining_eta, average_mode, agg
         np.random.shuffle(randomize)
         X = X[randomize]
         Y = Y[randomize]
+
+        if (declining_eta == 1):
+          rate = (rate/(1+t))
+
         for i in range (0, rows):
             if (mu > 0):
               # Margin perceptron and Aggressive Perceptron
@@ -52,7 +56,6 @@ def perceptron(X, Y, W, rate, mu, bias, epochs, declining_eta, average_mode, agg
                       a = a + W
                       bias_a = bias_a + bias
                   else:
-                    rate = (rate/(1+t))
                     W = W + rate*X[i]*Y[i,0]
                     bias = bias + (Y[i,0]*rate)
               elif (average_mode == 1):
@@ -166,15 +169,14 @@ def train_test_request_processor (kfold, eta, mu, bias, epochs, no_of_columns, W
   for i in range (1, 21):
     accuracy, new_W, new_bias = train_and_test_perceptron ('diabetes.train', 'diabetes.dev', no_of_columns,
                                                            W, best_eta, best_mu, bias, i, declining_rate, average_mode, aggressive_mode, 0)
-    print ("   Epoch : %-4d       Accuracy  : %-10.10f" % (i, accuracy))
+    #print ("   Epoch : %-4d       Accuracy  : %-10.10f" % (i, accuracy))
+    print (i, ",", accuracy)
     if (accuracy > best_accuracy):
       best_accuracy = accuracy
       best_epoch = i
       best_w = copy.deepcopy (new_W)
       best_bias = new_bias
 
-  accuracy, new_W, new_bias = train_and_test_perceptron ('diabetes.train', 'diabetes.dev', no_of_columns,
-                                                           W, best_eta, best_mu, bias, best_epoch, declining_rate, average_mode, aggressive_mode, 1)
   print ("   Best epoch                   : ", best_epoch)
   print ("   Best Dev Accuracy            : ", best_accuracy, "%")
 
@@ -233,10 +235,10 @@ def main_function (seed_value):
   declining_rate  = 0
   average_mode    = 0
   aggressive_mode = 0
+  accuracy        = 0
   print ("")
   print ("***************** Majority Baseline Start ******************")
   majority_baseline ("diabetes.train", "diabetes.dev", "diabetes.test", no_of_columns)
-
   print ("******************Basic Perceptron Start *******************")
   print ("******************Seed Value", seed_value, "*******************")
   accuracy = train_test_request_processor (kfold, eta_list, mu_list, bias, epochs, no_of_columns, W, declining_rate, average_mode, aggressive_mode)
@@ -268,6 +270,9 @@ def main_function (seed_value):
 
 
 main_function (40)
+#main_function (11)
+#main_function (29)
+
 
 '''
 best_accuracy = 0;
